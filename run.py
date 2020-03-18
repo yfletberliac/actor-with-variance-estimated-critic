@@ -15,7 +15,7 @@ for env_id in ["AntBulletEnv-v0"]:
         env = make_vec_env(env_id, 1, seed, monitor_dir=log_dir)
         model = PPO2('MlpPolicy', env, verbose=1, seed=seed,
                      avec_coef=1., vf_coef=0., tensorboard_log=log_dir)
-        model.learn(total_timesteps=10000, tb_log_name="tb/AVEC-PPO")
+        model.learn(total_timesteps=1000000, tb_log_name="tb/AVEC-PPO")
         # model.learn(total_timesteps=1000000, tb_log_name="tb/PPO")
 
 
@@ -26,7 +26,7 @@ for env_id in ["AntBulletEnv-v0"]:
         env = make_vec_env(env_id, 1, seed, monitor_dir=log_dir)
         model = TRPO('MlpPolicy', env, verbose=1,
                      avec_coef=1., vf_coef=0., tensorboard_log=log_dir)
-        model.learn(total_timesteps=10000, tb_log_name="tb/AVEC-TRPO")
+        model.learn(total_timesteps=1000000, tb_log_name="tb/AVEC-TRPO")
         # model.learn(total_timesteps=1000000, tb_log_name="tb/TRPO")
 
 
@@ -37,5 +37,5 @@ for env_id in ["AntBulletEnv-v0"]:
         env = make_vec_env(env_id, 1, seed, monitor_dir=log_dir)
         model = SAC('CustomSACPolicy', env, verbose=1,
                     avec_coef=1., value_coef=0., tensorboard_log=log_dir)
-        model.learn(total_timesteps=10000, tb_log_name="tb/AVEC-SAC")
+        model.learn(total_timesteps=1000000, tb_log_name="tb/AVEC-SAC")
         # model.learn(total_timesteps=1000000, tb_log_name="tb/SAC")
