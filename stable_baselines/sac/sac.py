@@ -126,6 +126,7 @@ class SAC(OffPolicyRLModel):
         self.observations_ph = None
         self.action_target = None
         self.next_observations_ph = None
+        self.deterministic_action = None
         self.value_target = None
         self.step_ops = None
         self.target_update_op = None
@@ -258,18 +259,18 @@ class SAC(OffPolicyRLModel):
                     # policy_loss = (policy_kl_loss + policy_regularization_loss)
                     policy_loss = policy_kl_loss
 
-
                     # Target for value fn regression
                     # We update the vf towards the min of two Q-functions in order to
                     # reduce overestimation bias from function approximation error.
                     v_backup = tf.stop_gradient(min_qf_pi - self.ent_coef * logp_pi)
                     value_loss = 0.5 * tf.reduce_mean((value_fn - v_backup) ** 2)
 
-                    self.explained_variance = explained_variance_tensor(tf.squeeze(value_fn, [1]), tf.reduce_mean(v_backup, [-1]))
-                    self.variance = variance_tensor(tf.reduce_mean(v_backup, [-1]))
-                    avec_loss = (1-self.explained_variance)*self.variance
+                    explained_variance = explained_variance_tensor(tf.squeeze(value_fn, [1]),
+                                                                   tf.reduce_mean(v_backup, [-1]))
+                    variance = variance_tensor(tf.reduce_mean(v_backup, [-1]))
+                    avec_loss = (1 - explained_variance) * variance
 
-                    values_losses = qf1_loss + qf2_loss + self.value_coef*value_loss + self.avec_coef*avec_loss
+                    values_losses = qf1_loss + qf2_loss + self.value_coef * value_loss + self.avec_coef * avec_loss
 
                     # Policy train op
                     # (has to be separate from value train op, because min_qf_pi appears in policy_loss)
@@ -454,7 +455,7 @@ class SAC(OffPolicyRLModel):
                         # Break if the warmup phase is not over
                         # or if there are not enough samples in the replay buffer
                         if not self.replay_buffer.can_sample(self.batch_size) \
-                           or self.num_timesteps < self.learning_starts:
+                                or self.num_timesteps < self.learning_starts:
                             break
                         n_updates += 1
                         # Compute current learning_rate
@@ -528,7 +529,7 @@ class SAC(OffPolicyRLModel):
         observation = observation.reshape((-1,) + self.observation_space.shape)
         actions = self.policy_tf.step(observation, deterministic=deterministic)
         actions = actions.reshape((-1,) + self.action_space.shape)  # reshape to the correct action shape
-        actions = unscale_action(self.action_space, actions) # scale the output for the prediction
+        actions = unscale_action(self.action_space, actions)  # scale the output for the prediction
 
         if not vectorized_env:
             actions = actions[0]
