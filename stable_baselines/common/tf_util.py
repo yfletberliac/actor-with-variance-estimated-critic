@@ -33,7 +33,7 @@ def huber_loss(tensor, delta=1.0):
     :param delta: (float) huber loss delta value
     :return: (TensorFlow Tensor) huber loss output
     """
-    return tf.where(
+    return tf.compat.v1.where(
         tf.abs(tensor) < delta,
         tf.square(tensor) * 0.5,
         delta * (tf.abs(tensor) - 0.5 * delta)
@@ -62,7 +62,7 @@ def make_session(num_cpu=None, make_default=False, graph=None):
     # Prevent tensorflow from taking all the gpu memory
     tf_config.gpu_options.allow_growth = True
     if make_default:
-        return tf.InteractiveSession(config=tf_config, graph=graph)
+        return tf.compat.v1.InteractiveSession(config=tf_config, graph=graph)
     else:
         return tf.compat.v1.Session(config=tf_config, graph=graph)
 
@@ -104,9 +104,9 @@ def initialize(sess=None):
     :param sess: (TensorFlow Session)
     """
     if sess is None:
-        sess = tf.get_default_session()
-    new_variables = set(tf.global_variables()) - ALREADY_INITIALIZED
-    sess.run(tf.variables_initializer(new_variables))
+        sess = tf.compat.v1.get_default_session()
+    new_variables = set(tf.compat.v1.global_variables()) - ALREADY_INITIALIZED
+    sess.run(tf.compat.v1.variables_initializer(new_variables))
     ALREADY_INITIALIZED.update(new_variables)
 
 
@@ -185,7 +185,7 @@ class _Function(object):
     def __call__(self, *args, sess=None, **kwargs):
         assert len(args) <= len(self.inputs), "Too many arguments provided"
         if sess is None:
-            sess = tf.get_default_session()
+            sess = tf.compat.v1.get_default_session()
         feed_dict = {}
         # Update the args
         for inpt, value in zip(self.inputs, args):
@@ -243,7 +243,7 @@ def flatgrad(loss, var_list, clip_norm=None):
     :param clip_norm: (float) clip the gradients (disabled if None)
     :return: ([TensorFlow Tensor]) flattend gradient
     """
-    grads = tf.gradients(loss, var_list)
+    grads = tf.gradients(ys=loss, xs=var_list)
     if clip_norm is not None:
         grads = [tf.clip_by_norm(grad, clip_norm=clip_norm) for grad in grads]
     return tf.concat(axis=0, values=[
@@ -264,19 +264,19 @@ class SetFromFlat(object):
         shapes = list(map(var_shape, var_list))
         total_size = np.sum([intprod(shape) for shape in shapes])
 
-        self.theta = theta = tf.placeholder(dtype, [total_size])
+        self.theta = theta = tf.compat.v1.placeholder(dtype, [total_size])
         start = 0
         assigns = []
         for (shape, _var) in zip(shapes, var_list):
             size = intprod(shape)
-            assigns.append(tf.assign(_var, tf.reshape(theta[start:start + size], shape)))
+            assigns.append(tf.compat.v1.assign(_var, tf.reshape(theta[start:start + size], shape)))
             start += size
         self.operation = tf.group(*assigns)
         self.sess = sess
 
     def __call__(self, theta):
         if self.sess is None:
-            return tf.get_default_session().run(self.operation, feed_dict={self.theta: theta})
+            return tf.compat.v1.get_default_session().run(self.operation, feed_dict={self.theta: theta})
         else:
             return self.sess.run(self.operation, feed_dict={self.theta: theta})
 
@@ -294,7 +294,7 @@ class GetFlat(object):
 
     def __call__(self):
         if self.sess is None:
-            return tf.get_default_session().run(self.operation)
+            return tf.compat.v1.get_default_session().run(self.operation)
         else:
             return self.sess.run(self.operation)
 
@@ -310,7 +310,7 @@ def get_trainable_vars(name):
     :param name: (str) the scope
     :return: ([TensorFlow Variable])
     """
-    return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=name)
+    return tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=name)
 
 
 def get_globals_vars(name):
@@ -320,7 +320,7 @@ def get_globals_vars(name):
     :param name: (str) the scope
     :return: ([TensorFlow Variable])
     """
-    return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
+    return tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, scope=name)
 
 
 def outer_scope_getter(scope, new_scope=""):

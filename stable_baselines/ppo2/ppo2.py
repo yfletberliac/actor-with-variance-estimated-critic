@@ -139,23 +139,23 @@ class PPO2(ActorCriticRLModel):
 
                 act_model = self.policy(self.sess, self.observation_space, self.action_space, self.n_envs, 1,
                                         n_batch_step, reuse=False, **self.policy_kwargs)
-                with tf.variable_scope("train_model", reuse=True,
+                with tf.compat.v1.variable_scope("train_model", reuse=True,
                                        custom_getter=tf_util.outer_scope_getter("train_model")):
                     train_model = self.policy(self.sess, self.observation_space, self.action_space,
                                               self.n_envs // self.nminibatches, self.n_steps, n_batch_train,
                                               reuse=True, **self.policy_kwargs)
 
-                with tf.variable_scope("loss", reuse=False):
+                with tf.compat.v1.variable_scope("loss", reuse=False):
                     self.action_ph = train_model.pdtype.sample_placeholder([None], name="action_ph")
-                    self.advs_ph = tf.placeholder(tf.float32, [None], name="advs_ph")
-                    self.rewards_ph = tf.placeholder(tf.float32, [None], name="rewards_ph")
-                    self.old_neglog_pac_ph = tf.placeholder(tf.float32, [None], name="old_neglog_pac_ph")
-                    self.old_vpred_ph = tf.placeholder(tf.float32, [None], name="old_vpred_ph")
-                    self.learning_rate_ph = tf.placeholder(tf.float32, [], name="learning_rate_ph")
-                    self.clip_range_ph = tf.placeholder(tf.float32, [], name="clip_range_ph")
+                    self.advs_ph = tf.compat.v1.placeholder(tf.float32, [None], name="advs_ph")
+                    self.rewards_ph = tf.compat.v1.placeholder(tf.float32, [None], name="rewards_ph")
+                    self.old_neglog_pac_ph = tf.compat.v1.placeholder(tf.float32, [None], name="old_neglog_pac_ph")
+                    self.old_vpred_ph = tf.compat.v1.placeholder(tf.float32, [None], name="old_vpred_ph")
+                    self.learning_rate_ph = tf.compat.v1.placeholder(tf.float32, [], name="learning_rate_ph")
+                    self.clip_range_ph = tf.compat.v1.placeholder(tf.float32, [], name="clip_range_ph")
 
                     neglogpac = train_model.proba_distribution.neglogp(self.action_ph)
-                    self.entropy = tf.reduce_mean(train_model.proba_distribution.entropy())
+                    self.entropy = tf.reduce_mean(input_tensor=train_model.proba_distribution.entropy())
 
                     vpred = train_model.value_flat
 
@@ -171,7 +171,7 @@ class PPO2(ActorCriticRLModel):
                     else:
                         # Last possible behavior: clipping range
                         # specific to the value function
-                        self.clip_range_vf_ph = tf.placeholder(tf.float32, [], name="clip_range_vf_ph")
+                        self.clip_range_vf_ph = tf.compat.v1.placeholder(tf.float32, [], name="clip_range_vf_ph")
 
                     if self.clip_range_vf_ph is None:
                         # No clipping
@@ -185,7 +185,7 @@ class PPO2(ActorCriticRLModel):
 
                     vf_losses1 = tf.square(vpred - self.rewards_ph)
                     vf_losses2 = tf.square(vpred_clipped - self.rewards_ph)
-                    self.vf_loss = .5 * tf.reduce_mean(tf.maximum(vf_losses1, vf_losses2))
+                    self.vf_loss = .5 * tf.reduce_mean(input_tensor=tf.maximum(vf_losses1, vf_losses2))
 
                     self.explained_variance = explained_variance_tensor(vpred, self.rewards_ph)
                     self.variance = variance_tensor(self.rewards_ph)
@@ -193,60 +193,60 @@ class PPO2(ActorCriticRLModel):
                     pg_losses = -self.advs_ph * ratio
                     pg_losses2 = -self.advs_ph * tf.clip_by_value(ratio, 1.0 - self.clip_range_ph, 1.0 +
                                                                   self.clip_range_ph)
-                    self.pg_loss = tf.reduce_mean(tf.maximum(pg_losses, pg_losses2))
-                    self.approxkl = .5 * tf.reduce_mean(tf.square(neglogpac - self.old_neglog_pac_ph))
-                    self.clipfrac = tf.reduce_mean(tf.cast(tf.greater(tf.abs(ratio - 1.0),
+                    self.pg_loss = tf.reduce_mean(input_tensor=tf.maximum(pg_losses, pg_losses2))
+                    self.approxkl = .5 * tf.reduce_mean(input_tensor=tf.square(neglogpac - self.old_neglog_pac_ph))
+                    self.clipfrac = tf.reduce_mean(input_tensor=tf.cast(tf.greater(tf.abs(ratio - 1.0),
                                                                       self.clip_range_ph), tf.float32))
 
                     loss = self.pg_loss + self.avec_coef * (
                                 1 - self.explained_variance) * self.variance + self.vf_loss * self.vf_coef
 
-                    tf.summary.scalar('entropy_loss', self.entropy)
-                    tf.summary.scalar('policy_gradient_loss', self.pg_loss)
-                    tf.summary.scalar('value_function_loss', self.vf_loss)
-                    tf.summary.scalar('approximate_kullback-leibler', self.approxkl)
-                    tf.summary.scalar('ratio', tf.reduce_mean(ratio))
-                    tf.summary.scalar('logratio', tf.log(tf.reduce_mean(ratio)))
-                    tf.summary.scalar('explained_variance', self.explained_variance)
-                    tf.summary.scalar('clip_factor', self.clipfrac)
-                    tf.summary.scalar('loss', loss)
+                    tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
+                    tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)
+                    tf.compat.v1.summary.scalar('value_function_loss', self.vf_loss)
+                    tf.compat.v1.summary.scalar('approximate_kullback-leibler', self.approxkl)
+                    tf.compat.v1.summary.scalar('ratio', tf.reduce_mean(input_tensor=ratio))
+                    tf.compat.v1.summary.scalar('logratio', tf.math.log(tf.reduce_mean(input_tensor=ratio)))
+                    tf.compat.v1.summary.scalar('explained_variance', self.explained_variance)
+                    tf.compat.v1.summary.scalar('clip_factor', self.clipfrac)
+                    tf.compat.v1.summary.scalar('loss', loss)
 
-                    with tf.variable_scope('model'):
-                        self.params = tf.trainable_variables()
+                    with tf.compat.v1.variable_scope('model'):
+                        self.params = tf.compat.v1.trainable_variables()
                         if self.full_tensorboard_log:
                             for var in self.params:
-                                tf.summary.histogram(var.name, var)
-                    grads = tf.gradients(loss, self.params)
+                                tf.compat.v1.summary.histogram(var.name, var)
+                    grads = tf.gradients(ys=loss, xs=self.params)
                     if self.max_grad_norm is not None:
                         grads, _grad_norm = tf.clip_by_global_norm(grads, self.max_grad_norm)
                     grads = list(zip(grads, self.params))
-                trainer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph, epsilon=1e-5)
+                trainer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate_ph, epsilon=1e-5)
                 self._train = trainer.apply_gradients(grads)
 
                 self.loss_names = ['policy_loss', 'value_loss', 'policy_entropy', 'approxkl', 'clipfrac']
 
-                with tf.variable_scope("input_info", reuse=False):
-                    tf.summary.scalar('discounted_rewards', tf.reduce_mean(self.rewards_ph))
-                    tf.summary.scalar('learning_rate', tf.reduce_mean(self.learning_rate_ph))
-                    tf.summary.scalar('advantage', tf.reduce_mean(self.advs_ph))
-                    tf.summary.scalar('clip_range', tf.reduce_mean(self.clip_range_ph))
+                with tf.compat.v1.variable_scope("input_info", reuse=False):
+                    tf.compat.v1.summary.scalar('discounted_rewards', tf.reduce_mean(input_tensor=self.rewards_ph))
+                    tf.compat.v1.summary.scalar('learning_rate', tf.reduce_mean(input_tensor=self.learning_rate_ph))
+                    tf.compat.v1.summary.scalar('advantage', tf.reduce_mean(input_tensor=self.advs_ph))
+                    tf.compat.v1.summary.scalar('clip_range', tf.reduce_mean(input_tensor=self.clip_range_ph))
                     if self.clip_range_vf_ph is not None:
-                        tf.summary.scalar('clip_range_vf', tf.reduce_mean(self.clip_range_vf_ph))
+                        tf.compat.v1.summary.scalar('clip_range_vf', tf.reduce_mean(input_tensor=self.clip_range_vf_ph))
 
-                    tf.summary.scalar('old_neglog_action_probabilty', tf.reduce_mean(self.old_neglog_pac_ph))
-                    tf.summary.scalar('old_value_pred', tf.reduce_mean(self.old_vpred_ph))
+                    tf.compat.v1.summary.scalar('old_neglog_action_probabilty', tf.reduce_mean(input_tensor=self.old_neglog_pac_ph))
+                    tf.compat.v1.summary.scalar('old_value_pred', tf.reduce_mean(input_tensor=self.old_vpred_ph))
 
                     if self.full_tensorboard_log:
-                        tf.summary.histogram('discounted_rewards', self.rewards_ph)
-                        tf.summary.histogram('learning_rate', self.learning_rate_ph)
-                        tf.summary.histogram('advantage', self.advs_ph)
-                        tf.summary.histogram('clip_range', self.clip_range_ph)
-                        tf.summary.histogram('old_neglog_action_probabilty', self.old_neglog_pac_ph)
-                        tf.summary.histogram('old_value_pred', self.old_vpred_ph)
+                        tf.compat.v1.summary.histogram('discounted_rewards', self.rewards_ph)
+                        tf.compat.v1.summary.histogram('learning_rate', self.learning_rate_ph)
+                        tf.compat.v1.summary.histogram('advantage', self.advs_ph)
+                        tf.compat.v1.summary.histogram('clip_range', self.clip_range_ph)
+                        tf.compat.v1.summary.histogram('old_neglog_action_probabilty', self.old_neglog_pac_ph)
+                        tf.compat.v1.summary.histogram('old_value_pred', self.old_vpred_ph)
                         if tf_util.is_image(self.observation_space):
-                            tf.summary.image('observation', train_model.obs_ph)
+                            tf.compat.v1.summary.image('observation', train_model.obs_ph)
                         else:
-                            tf.summary.histogram('observation', train_model.obs_ph)
+                            tf.compat.v1.summary.histogram('observation', train_model.obs_ph)
 
                 self.train_model = train_model
                 self.act_model = act_model
@@ -254,9 +254,9 @@ class PPO2(ActorCriticRLModel):
                 self.proba_step = act_model.proba_step
                 self.value = act_model.value
                 self.initial_state = act_model.initial_state
-                tf.global_variables_initializer().run(session=self.sess)  # pylint: disable=E1101
+                tf.compat.v1.global_variables_initializer().run(session=self.sess)  # pylint: disable=E1101
 
-                self.summary = tf.summary.merge_all()
+                self.summary = tf.compat.v1.summary.merge_all()
 
     def _train_step(self, learning_rate, cliprange, obs, returns, masks, actions, values, neglogpacs, update,
                     writer, states=None, cliprange_vf=None):
@@ -299,8 +299,8 @@ class PPO2(ActorCriticRLModel):
         if writer is not None and (1 + update) % 10 == 0:
             # run loss backprop with summary, but once every 10 runs save the metadata (memory, compute time, ...)
             if self.full_tensorboard_log and (1 + update) % 10 == 0:
-                run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                run_metadata = tf.RunMetadata()
+                run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
+                run_metadata = tf.compat.v1.RunMetadata()
                 summary, policy_loss, value_loss, policy_entropy, approxkl, clipfrac, _ = self.sess.run(
                     [self.summary, self.pg_loss, self.vf_loss, self.entropy, self.approxkl, self.clipfrac, self._train],
                     td_map, options=run_options, run_metadata=run_metadata)

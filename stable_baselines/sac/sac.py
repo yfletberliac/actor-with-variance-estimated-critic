@@ -156,7 +156,7 @@ class SAC(OffPolicyRLModel):
 
                 self.replay_buffer = ReplayBuffer(self.buffer_size)
 
-                with tf.variable_scope("input", reuse=False):
+                with tf.compat.v1.variable_scope("input", reuse=False):
                     # Create policy and target TF objects
                     self.policy_tf = self.policy(self.sess, self.observation_space, self.action_space,
                                                  **self.policy_kwargs)
@@ -170,13 +170,13 @@ class SAC(OffPolicyRLModel):
                     self.next_observations_ph = self.target_policy.obs_ph
                     self.processed_next_obs_ph = self.target_policy.processed_obs
                     self.action_target = self.target_policy.action_ph
-                    self.terminals_ph = tf.placeholder(tf.float32, shape=(None, 1), name='terminals')
-                    self.rewards_ph = tf.placeholder(tf.float32, shape=(None, 1), name='rewards')
-                    self.actions_ph = tf.placeholder(tf.float32, shape=(None,) + self.action_space.shape,
+                    self.terminals_ph = tf.compat.v1.placeholder(tf.float32, shape=(None, 1), name='terminals')
+                    self.rewards_ph = tf.compat.v1.placeholder(tf.float32, shape=(None, 1), name='rewards')
+                    self.actions_ph = tf.compat.v1.placeholder(tf.float32, shape=(None,) + self.action_space.shape,
                                                      name='actions')
-                    self.learning_rate_ph = tf.placeholder(tf.float32, [], name="learning_rate_ph")
+                    self.learning_rate_ph = tf.compat.v1.placeholder(tf.float32, [], name="learning_rate_ph")
 
-                with tf.variable_scope("model", reuse=False):
+                with tf.compat.v1.variable_scope("model", reuse=False):
                     # Create the policy
                     # first return value corresponds to deterministic actions
                     # policy_out corresponds to stochastic actions, used for training
@@ -184,7 +184,7 @@ class SAC(OffPolicyRLModel):
                     self.deterministic_action, policy_out, logp_pi = self.policy_tf.make_actor(self.processed_obs_ph)
                     # Monitor the entropy of the policy,
                     # this is not used for training
-                    self.entropy = tf.reduce_mean(self.policy_tf.entropy)
+                    self.entropy = tf.reduce_mean(input_tensor=self.policy_tf.entropy)
                     #  Use two Q-functions to improve performance by reducing overestimation bias.
                     qf1, qf2, value_fn = self.policy_tf.make_critics(self.processed_obs_ph, self.actions_ph,
                                                                      create_qf=True, create_vf=True)
@@ -211,7 +211,7 @@ class SAC(OffPolicyRLModel):
                             init_value = float(self.ent_coef.split('_')[1])
                             assert init_value > 0., "The initial value of ent_coef must be greater than 0"
 
-                        self.log_ent_coef = tf.get_variable('log_ent_coef', dtype=tf.float32,
+                        self.log_ent_coef = tf.compat.v1.get_variable('log_ent_coef', dtype=tf.float32,
                                                             initializer=np.log(init_value).astype(np.float32))
                         self.ent_coef = tf.exp(self.log_ent_coef)
                     else:
@@ -220,13 +220,13 @@ class SAC(OffPolicyRLModel):
                         # is passed
                         self.ent_coef = float(self.ent_coef)
 
-                with tf.variable_scope("target", reuse=False):
+                with tf.compat.v1.variable_scope("target", reuse=False):
                     # Create the value network
                     _, _, value_target = self.target_policy.make_critics(self.processed_next_obs_ph,
                                                                          create_qf=False, create_vf=True)
                     self.value_target = value_target
 
-                with tf.variable_scope("loss", reuse=False):
+                with tf.compat.v1.variable_scope("loss", reuse=False):
                     # Take the min of the two Q-Values (Double-Q Learning)
                     min_qf_pi = tf.minimum(qf1_pi, qf2_pi)
 
@@ -238,20 +238,20 @@ class SAC(OffPolicyRLModel):
 
                     # Compute Q-Function loss
                     # TODO: test with huber loss (it would avoid too high values)
-                    qf1_loss = 0.5 * tf.reduce_mean((q_backup - qf1) ** 2)
-                    qf2_loss = 0.5 * tf.reduce_mean((q_backup - qf2) ** 2)
+                    qf1_loss = 0.5 * tf.reduce_mean(input_tensor=(q_backup - qf1) ** 2)
+                    qf2_loss = 0.5 * tf.reduce_mean(input_tensor=(q_backup - qf2) ** 2)
 
                     # Compute the entropy temperature loss
                     # it is used when the entropy coefficient is learned
                     ent_coef_loss, entropy_optimizer = None, None
                     if not isinstance(self.ent_coef, float):
                         ent_coef_loss = -tf.reduce_mean(
-                            self.log_ent_coef * tf.stop_gradient(logp_pi + self.target_entropy))
-                        entropy_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
+                            input_tensor=self.log_ent_coef * tf.stop_gradient(logp_pi + self.target_entropy))
+                        entropy_optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
 
                     # Compute the policy loss
                     # Alternative: policy_kl_loss = tf.reduce_mean(logp_pi - min_qf_pi)
-                    policy_kl_loss = tf.reduce_mean(self.ent_coef * logp_pi - qf1_pi)
+                    policy_kl_loss = tf.reduce_mean(input_tensor=self.ent_coef * logp_pi - qf1_pi)
 
                     # NOTE: in the original implementation, they have an additional
                     # regularization loss for the gaussian parameters
@@ -263,22 +263,22 @@ class SAC(OffPolicyRLModel):
                     # We update the vf towards the min of two Q-functions in order to
                     # reduce overestimation bias from function approximation error.
                     v_backup = tf.stop_gradient(min_qf_pi - self.ent_coef * logp_pi)
-                    value_loss = 0.5 * tf.reduce_mean((value_fn - v_backup) ** 2)
+                    value_loss = 0.5 * tf.reduce_mean(input_tensor=(value_fn - v_backup) ** 2)
 
                     explained_variance = explained_variance_tensor(tf.squeeze(value_fn, [1]),
-                                                                   tf.reduce_mean(v_backup, [-1]))
-                    variance = variance_tensor(tf.reduce_mean(v_backup, [-1]))
+                                                                   tf.reduce_mean(input_tensor=v_backup, axis=[-1]))
+                    variance = variance_tensor(tf.reduce_mean(input_tensor=v_backup, axis=[-1]))
                     avec_loss = (1 - explained_variance) * variance
 
                     values_losses = qf1_loss + qf2_loss + self.value_coef * value_loss + self.avec_coef * avec_loss
 
                     # Policy train op
                     # (has to be separate from value train op, because min_qf_pi appears in policy_loss)
-                    policy_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
+                    policy_optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
                     policy_train_op = policy_optimizer.minimize(policy_loss, var_list=get_vars('model/pi'))
 
                     # Value train op
-                    value_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
+                    value_optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
                     values_params = get_vars('model/values_fn')
 
                     source_params = get_vars("model/values_fn/vf")
@@ -286,12 +286,12 @@ class SAC(OffPolicyRLModel):
 
                     # Polyak averaging for target variables
                     self.target_update_op = [
-                        tf.assign(target, (1 - self.tau) * target + self.tau * source)
+                        tf.compat.v1.assign(target, (1 - self.tau) * target + self.tau * source)
                         for target, source in zip(target_params, source_params)
                     ]
                     # Initializing target to match source variables
                     target_init_op = [
-                        tf.assign(target, source)
+                        tf.compat.v1.assign(target, source)
                         for target, source in zip(target_params, source_params)
                     ]
 
@@ -314,16 +314,16 @@ class SAC(OffPolicyRLModel):
                                 self.step_ops += [ent_coef_op, ent_coef_loss, self.ent_coef]
 
                     # Monitor losses and entropy in tensorboard
-                    tf.summary.scalar('policy_loss', policy_loss)
-                    tf.summary.scalar('qf1_loss', qf1_loss)
-                    tf.summary.scalar('qf2_loss', qf2_loss)
-                    tf.summary.scalar('value_loss', value_loss)
-                    tf.summary.scalar('entropy', self.entropy)
+                    tf.compat.v1.summary.scalar('policy_loss', policy_loss)
+                    tf.compat.v1.summary.scalar('qf1_loss', qf1_loss)
+                    tf.compat.v1.summary.scalar('qf2_loss', qf2_loss)
+                    tf.compat.v1.summary.scalar('value_loss', value_loss)
+                    tf.compat.v1.summary.scalar('entropy', self.entropy)
                     if ent_coef_loss is not None:
-                        tf.summary.scalar('ent_coef_loss', ent_coef_loss)
-                        tf.summary.scalar('ent_coef', self.ent_coef)
+                        tf.compat.v1.summary.scalar('ent_coef_loss', ent_coef_loss)
+                        tf.compat.v1.summary.scalar('ent_coef', self.ent_coef)
 
-                    tf.summary.scalar('learning_rate', tf.reduce_mean(self.learning_rate_ph))
+                    tf.compat.v1.summary.scalar('learning_rate', tf.reduce_mean(input_tensor=self.learning_rate_ph))
 
                 # Retrieve parameters that must be saved
                 self.params = get_vars("model")
@@ -331,10 +331,10 @@ class SAC(OffPolicyRLModel):
 
                 # Initialize Variables and target network
                 with self.sess.as_default():
-                    self.sess.run(tf.global_variables_initializer())
+                    self.sess.run(tf.compat.v1.global_variables_initializer())
                     self.sess.run(target_init_op)
 
-                self.summary = tf.summary.merge_all()
+                self.summary = tf.compat.v1.summary.merge_all()
 
     def _train_step(self, step, writer, learning_rate):
         # Sample a batch from the replay buffer

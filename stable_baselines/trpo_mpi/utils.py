@@ -38,38 +38,38 @@ class TransitionClassifier(object):
         self.obs_rms = None
 
         # Placeholders
-        self.generator_obs_ph = tf.placeholder(observation_space.dtype, (None,) + self.observation_shape,
+        self.generator_obs_ph = tf.compat.v1.placeholder(observation_space.dtype, (None,) + self.observation_shape,
                                                name="observations_ph")
-        self.generator_acs_ph = tf.placeholder(action_space.dtype, (None,) + self.actions_shape,
+        self.generator_acs_ph = tf.compat.v1.placeholder(action_space.dtype, (None,) + self.actions_shape,
                                                name="actions_ph")
-        self.expert_obs_ph = tf.placeholder(observation_space.dtype, (None,) + self.observation_shape,
+        self.expert_obs_ph = tf.compat.v1.placeholder(observation_space.dtype, (None,) + self.observation_shape,
                                             name="expert_observations_ph")
-        self.expert_acs_ph = tf.placeholder(action_space.dtype, (None,) + self.actions_shape,
+        self.expert_acs_ph = tf.compat.v1.placeholder(action_space.dtype, (None,) + self.actions_shape,
                                             name="expert_actions_ph")
         # Build graph
         generator_logits = self.build_graph(self.generator_obs_ph, self.generator_acs_ph, reuse=False)
         expert_logits = self.build_graph(self.expert_obs_ph, self.expert_acs_ph, reuse=True)
         # Build accuracy
-        generator_acc = tf.reduce_mean(tf.cast(tf.nn.sigmoid(generator_logits) < 0.5, tf.float32))
-        expert_acc = tf.reduce_mean(tf.cast(tf.nn.sigmoid(expert_logits) > 0.5, tf.float32))
+        generator_acc = tf.reduce_mean(input_tensor=tf.cast(tf.nn.sigmoid(generator_logits) < 0.5, tf.float32))
+        expert_acc = tf.reduce_mean(input_tensor=tf.cast(tf.nn.sigmoid(expert_logits) > 0.5, tf.float32))
         # Build regression loss
         # let x = logits, z = targets.
         # z * -log(sigmoid(x)) + (1 - z) * -log(1 - sigmoid(x))
         generator_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=generator_logits,
                                                                  labels=tf.zeros_like(generator_logits))
-        generator_loss = tf.reduce_mean(generator_loss)
+        generator_loss = tf.reduce_mean(input_tensor=generator_loss)
         expert_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=expert_logits, labels=tf.ones_like(expert_logits))
-        expert_loss = tf.reduce_mean(expert_loss)
+        expert_loss = tf.reduce_mean(input_tensor=expert_loss)
         # Build entropy loss
         logits = tf.concat([generator_logits, expert_logits], 0)
-        entropy = tf.reduce_mean(logit_bernoulli_entropy(logits))
+        entropy = tf.reduce_mean(input_tensor=logit_bernoulli_entropy(logits))
         entropy_loss = -entcoeff * entropy
         # Loss + Accuracy terms
         self.losses = [generator_loss, expert_loss, entropy, entropy_loss, generator_acc, expert_acc]
         self.loss_name = ["generator_loss", "expert_loss", "entropy", "entropy_loss", "generator_acc", "expert_acc"]
         self.total_loss = generator_loss + expert_loss + entropy_loss
         # Build Reward for policy
-        self.reward_op = -tf.log(1 - tf.nn.sigmoid(generator_logits) + 1e-8)
+        self.reward_op = -tf.math.log(1 - tf.nn.sigmoid(generator_logits) + 1e-8)
         var_list = self.get_trainable_variables()
         self.lossandgrad = tf_util.function(
             [self.generator_obs_ph, self.generator_acs_ph, self.expert_obs_ph, self.expert_acs_ph],
@@ -84,12 +84,12 @@ class TransitionClassifier(object):
         :param reuse: (bool)
         :return: (tf.Tensor) the graph output
         """
-        with tf.variable_scope(self.scope):
+        with tf.compat.v1.variable_scope(self.scope):
             if reuse:
-                tf.get_variable_scope().reuse_variables()
+                tf.compat.v1.get_variable_scope().reuse_variables()
 
             if self.normalize:
-                with tf.variable_scope("obfilter"):
+                with tf.compat.v1.variable_scope("obfilter"):
                     self.obs_rms = RunningMeanStd(shape=self.observation_shape)
                 obs = (obs_ph - self.obs_rms.mean) / self.obs_rms.std
             else:
@@ -113,7 +113,7 @@ class TransitionClassifier(object):
 
         :return: ([tf.Tensor]) the variables
         """
-        return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
+        return tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, self.scope)
 
     def get_reward(self, obs, actions):
         """
@@ -123,7 +123,7 @@ class TransitionClassifier(object):
         :param actions: (tf.Tensor or np.ndarray) the action
         :return: (np.ndarray) the reward
         """
-        sess = tf.get_default_session()
+        sess = tf.compat.v1.get_default_session()
         if len(obs.shape) == 1:
             obs = np.expand_dims(obs, 0)
         if len(actions.shape) == 1:

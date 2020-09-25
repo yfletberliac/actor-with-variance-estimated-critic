@@ -141,7 +141,7 @@ class ProbabilityDistributionType(object):
         :param name: (str) the placeholder name
         :return: (TensorFlow Tensor) the placeholder
         """
-        return tf.placeholder(dtype=tf.float32, shape=prepend_shape + self.param_shape(), name=name)
+        return tf.compat.v1.placeholder(dtype=tf.float32, shape=prepend_shape + self.param_shape(), name=name)
 
     def sample_placeholder(self, prepend_shape, name=None):
         """
@@ -151,7 +151,7 @@ class ProbabilityDistributionType(object):
         :param name: (str) the placeholder name
         :return: (TensorFlow Tensor) the placeholder
         """
-        return tf.placeholder(dtype=self.sample_dtype(), shape=prepend_shape + self.sample_shape(), name=name)
+        return tf.compat.v1.placeholder(dtype=self.sample_dtype(), shape=prepend_shape + self.sample_shape(), name=name)
 
 
 class CategoricalProbabilityDistributionType(ProbabilityDistributionType):
@@ -237,7 +237,7 @@ class DiagGaussianProbabilityDistributionType(ProbabilityDistributionType):
 
     def proba_distribution_from_latent(self, pi_latent_vector, vf_latent_vector, init_scale=1.0, init_bias=0.0):
         mean = linear(pi_latent_vector, 'pi', self.size, init_scale=init_scale, init_bias=init_bias)
-        logstd = tf.get_variable(name='pi/logstd', shape=[1, self.size], initializer=tf.zeros_initializer())
+        logstd = tf.compat.v1.get_variable(name='pi/logstd', shape=[1, self.size], initializer=tf.compat.v1.zeros_initializer())
         pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
         q_values = linear(vf_latent_vector, 'q', self.size, init_scale=init_scale, init_bias=init_bias)
         return self.proba_distribution_from_flat(pdparam), mean, q_values
@@ -293,38 +293,38 @@ class CategoricalProbabilityDistribution(ProbabilityDistribution):
         return self.logits
 
     def mode(self):
-        return tf.argmax(self.logits, axis=-1)
+        return tf.argmax(input=self.logits, axis=-1)
 
     def neglogp(self, x):
         # Note: we can't use sparse_softmax_cross_entropy_with_logits because
         #       the implementation does not allow second-order derivatives...
         one_hot_actions = tf.one_hot(x, self.logits.get_shape().as_list()[-1])
-        return tf.nn.softmax_cross_entropy_with_logits_v2(
+        return tf.nn.softmax_cross_entropy_with_logits(
             logits=self.logits,
             labels=tf.stop_gradient(one_hot_actions))
 
     def kl(self, other):
-        a_0 = self.logits - tf.reduce_max(self.logits, axis=-1, keepdims=True)
-        a_1 = other.logits - tf.reduce_max(other.logits, axis=-1, keepdims=True)
+        a_0 = self.logits - tf.reduce_max(input_tensor=self.logits, axis=-1, keepdims=True)
+        a_1 = other.logits - tf.reduce_max(input_tensor=other.logits, axis=-1, keepdims=True)
         exp_a_0 = tf.exp(a_0)
         exp_a_1 = tf.exp(a_1)
-        z_0 = tf.reduce_sum(exp_a_0, axis=-1, keepdims=True)
-        z_1 = tf.reduce_sum(exp_a_1, axis=-1, keepdims=True)
+        z_0 = tf.reduce_sum(input_tensor=exp_a_0, axis=-1, keepdims=True)
+        z_1 = tf.reduce_sum(input_tensor=exp_a_1, axis=-1, keepdims=True)
         p_0 = exp_a_0 / z_0
-        return tf.reduce_sum(p_0 * (a_0 - tf.log(z_0) - a_1 + tf.log(z_1)), axis=-1)
+        return tf.reduce_sum(input_tensor=p_0 * (a_0 - tf.math.log(z_0) - a_1 + tf.math.log(z_1)), axis=-1)
 
     def entropy(self):
-        a_0 = self.logits - tf.reduce_max(self.logits, axis=-1, keepdims=True)
+        a_0 = self.logits - tf.reduce_max(input_tensor=self.logits, axis=-1, keepdims=True)
         exp_a_0 = tf.exp(a_0)
-        z_0 = tf.reduce_sum(exp_a_0, axis=-1, keepdims=True)
+        z_0 = tf.reduce_sum(input_tensor=exp_a_0, axis=-1, keepdims=True)
         p_0 = exp_a_0 / z_0
-        return tf.reduce_sum(p_0 * (tf.log(z_0) - a_0), axis=-1)
+        return tf.reduce_sum(input_tensor=p_0 * (tf.math.log(z_0) - a_0), axis=-1)
 
     def sample(self):
         # Gumbel-max trick to sample
         # a categorical distribution (see http://amid.fish/humble-gumbel)
-        uniform = tf.random_uniform(tf.shape(self.logits), dtype=self.logits.dtype)
-        return tf.argmax(self.logits - tf.log(-tf.log(uniform)), axis=-1)
+        uniform = tf.random.uniform(tf.shape(input=self.logits), dtype=self.logits.dtype)
+        return tf.argmax(input=self.logits - tf.math.log(-tf.math.log(uniform)), axis=-1)
 
     @classmethod
     def fromflat(cls, flat):
@@ -400,22 +400,22 @@ class DiagGaussianProbabilityDistribution(ProbabilityDistribution):
         return self.mean
 
     def neglogp(self, x):
-        return 0.5 * tf.reduce_sum(tf.square((x - self.mean) / self.std), axis=-1) \
-               + 0.5 * np.log(2.0 * np.pi) * tf.cast(tf.shape(x)[-1], tf.float32) \
-               + tf.reduce_sum(self.logstd, axis=-1)
+        return 0.5 * tf.reduce_sum(input_tensor=tf.square((x - self.mean) / self.std), axis=-1) \
+               + 0.5 * np.log(2.0 * np.pi) * tf.cast(tf.shape(input=x)[-1], tf.float32) \
+               + tf.reduce_sum(input_tensor=self.logstd, axis=-1)
 
     def kl(self, other):
         assert isinstance(other, DiagGaussianProbabilityDistribution)
-        return tf.reduce_sum(other.logstd - self.logstd + (tf.square(self.std) + tf.square(self.mean - other.mean)) /
+        return tf.reduce_sum(input_tensor=other.logstd - self.logstd + (tf.square(self.std) + tf.square(self.mean - other.mean)) /
                              (2.0 * tf.square(other.std)) - 0.5, axis=-1)
 
     def entropy(self):
-        return tf.reduce_sum(self.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
+        return tf.reduce_sum(input_tensor=self.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
 
     def sample(self):
         # Bounds are taken into acount outside this class (during training only)
         # Otherwise, it changes the distribution and breaks PPO2 for instance
-        return self.mean + self.std * tf.random_normal(tf.shape(self.mean),
+        return self.mean + self.std * tf.random.normal(tf.shape(input=self.mean),
                                                        dtype=self.mean.dtype)
 
     @classmethod
@@ -447,22 +447,22 @@ class BernoulliProbabilityDistribution(ProbabilityDistribution):
         return tf.round(self.probabilities)
 
     def neglogp(self, x):
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
+        return tf.reduce_sum(input_tensor=tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
                                                                      labels=tf.cast(x, tf.float32)),
                              axis=-1)
 
     def kl(self, other):
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=other.logits,
+        return tf.reduce_sum(input_tensor=tf.nn.sigmoid_cross_entropy_with_logits(logits=other.logits,
                                                                      labels=self.probabilities), axis=-1) - \
-               tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
+               tf.reduce_sum(input_tensor=tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
                                                                      labels=self.probabilities), axis=-1)
 
     def entropy(self):
-        return tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
+        return tf.reduce_sum(input_tensor=tf.nn.sigmoid_cross_entropy_with_logits(logits=self.logits,
                                                                      labels=self.probabilities), axis=-1)
 
     def sample(self):
-        samples_from_uniform = tf.random_uniform(tf.shape(self.probabilities))
+        samples_from_uniform = tf.random.uniform(tf.shape(input=self.probabilities))
         return tf.cast(math_ops.less(samples_from_uniform, self.probabilities), tf.float32)
 
     @classmethod
@@ -510,4 +510,4 @@ def shape_el(tensor, index):
     if maybe is not None:
         return maybe
     else:
-        return tf.shape(tensor)[index]
+        return tf.shape(input=tensor)[index]

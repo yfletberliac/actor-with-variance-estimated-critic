@@ -112,7 +112,7 @@ class BasePolicy(ABC):
         self.n_env = n_env
         self.n_steps = n_steps
         self.n_batch = n_batch
-        with tf.variable_scope("input", reuse=False):
+        with tf.compat.v1.variable_scope("input", reuse=False):
             if obs_phs is None:
                 self._obs_ph, self._processed_obs = observation_input(ob_space, n_batch, scale=scale)
             else:
@@ -120,7 +120,7 @@ class BasePolicy(ABC):
 
             self._action_ph = None
             if add_action_ph:
-                self._action_ph = tf.placeholder(dtype=ac_space.dtype, shape=(n_batch,) + ac_space.shape,
+                self._action_ph = tf.compat.v1.placeholder(dtype=ac_space.dtype, shape=(n_batch,) + ac_space.shape,
                                                  name="action_ph")
         self.sess = sess
         self.reuse = reuse
@@ -228,7 +228,7 @@ class ActorCriticPolicy(BasePolicy):
 
     def _setup_init(self):
         """Sets up the distributions, actions, and value."""
-        with tf.variable_scope("output", reuse=True):
+        with tf.compat.v1.variable_scope("output", reuse=True):
             assert self.policy is not None and self.proba_distribution is not None and self.value_fn is not None
             self._action = self.proba_distribution.sample()
             self._deterministic_action = self.proba_distribution.mode()
@@ -341,10 +341,10 @@ class RecurrentActorCriticPolicy(ActorCriticPolicy):
         super(RecurrentActorCriticPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps,
                                                          n_batch, reuse=reuse, scale=scale)
 
-        with tf.variable_scope("input", reuse=False):
-            self._dones_ph = tf.placeholder(tf.float32, (n_batch, ), name="dones_ph")  # (done t-1)
+        with tf.compat.v1.variable_scope("input", reuse=False):
+            self._dones_ph = tf.compat.v1.placeholder(tf.float32, (n_batch, ), name="dones_ph")  # (done t-1)
             state_ph_shape = (self.n_env, ) + tuple(state_shape)
-            self._states_ph = tf.placeholder(tf.float32, state_ph_shape, name="states_ph")
+            self._states_ph = tf.compat.v1.placeholder(tf.float32, state_ph_shape, name="states_ph")
 
         initial_state_shape = (self.n_env, ) + tuple(state_shape)
         self._initial_state = np.zeros(initial_state_shape, dtype=np.float32)
@@ -412,11 +412,11 @@ class LstmPolicy(RecurrentActorCriticPolicy):
             else:
                 warnings.warn("The layers parameter is deprecated. Use the net_arch parameter instead.")
 
-            with tf.variable_scope("model", reuse=reuse):
+            with tf.compat.v1.variable_scope("model", reuse=reuse):
                 if feature_extraction == "cnn":
                     extracted_features = cnn_extractor(self.processed_obs, **kwargs)
                 else:
-                    extracted_features = tf.layers.flatten(self.processed_obs)
+                    extracted_features = tf.compat.v1.layers.flatten(self.processed_obs)
                     for i, layer_size in enumerate(layers):
                         extracted_features = act_fun(linear(extracted_features, 'pi_fc' + str(i), n_hidden=layer_size,
                                                             init_scale=np.sqrt(2)))
@@ -437,8 +437,8 @@ class LstmPolicy(RecurrentActorCriticPolicy):
             if feature_extraction == "cnn":
                 raise NotImplementedError()
 
-            with tf.variable_scope("model", reuse=reuse):
-                latent = tf.layers.flatten(self.processed_obs)
+            with tf.compat.v1.variable_scope("model", reuse=reuse):
+                latent = tf.compat.v1.layers.flatten(self.processed_obs)
                 policy_only_layers = []  # Layer sizes of the network that only belongs to the policy network
                 value_only_layers = []  # Layer sizes of the network that only belongs to the value network
 
@@ -553,11 +553,11 @@ class FeedForwardPolicy(ActorCriticPolicy):
                 layers = [64, 64]
             net_arch = [dict(vf=layers, pi=layers)]
 
-        with tf.variable_scope("model", reuse=reuse):
+        with tf.compat.v1.variable_scope("model", reuse=reuse):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
-                pi_latent, vf_latent = mlp_extractor(tf.layers.flatten(self.processed_obs), net_arch, act_fun)
+                pi_latent, vf_latent = mlp_extractor(tf.compat.v1.layers.flatten(self.processed_obs), net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
 

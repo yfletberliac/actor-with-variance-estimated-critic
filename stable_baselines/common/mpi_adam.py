@@ -93,18 +93,18 @@ def test_mpi_adam():
 
     a_var = tf.Variable(np.random.randn(3).astype('float32'))
     b_var = tf.Variable(np.random.randn(2, 5).astype('float32'))
-    loss = tf.reduce_sum(tf.square(a_var)) + tf.reduce_sum(tf.sin(b_var))
+    loss = tf.reduce_sum(input_tensor=tf.square(a_var)) + tf.reduce_sum(input_tensor=tf.sin(b_var))
 
     learning_rate = 1e-2
-    update_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    update_op = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss)
     do_update = tf_utils.function([], loss, updates=[update_op])
 
-    tf.get_default_session().run(tf.global_variables_initializer())
+    tf.compat.v1.get_default_session().run(tf.compat.v1.global_variables_initializer())
     for step in range(10):
         print(step, do_update())
 
     tf.compat.v1.set_random_seed(0)
-    tf.get_default_session().run(tf.global_variables_initializer())
+    tf.compat.v1.get_default_session().run(tf.compat.v1.global_variables_initializer())
 
     var_list = [a_var, b_var]
     lossandgrad = tf_utils.function([], [loss, tf_utils.flatgrad(loss, var_list)], updates=[update_op])
