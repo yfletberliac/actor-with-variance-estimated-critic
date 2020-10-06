@@ -1,10 +1,10 @@
 # Actor with Variance Estimated Critic (AVEC)
 
-AVEC is a fork of [Stable Baselines](https://github.com/hill-a/stable-baselines) codebase.
+This is the implementation of Actor with Variance Estimated Critic (AVEC). The code is a fork of [Stable Baselines](https://github.com/hill-a/stable-baselines).
 
 ## Installation
 
-This repository supports Tensorflow versions from 1.8.0 to 1.14.0.
+This repository supports Tensorflow versions from 1.14.0 to 2.3.1. Works on GPUs.
 
 ### Prerequisites
 Baselines requires python3 (>=3.5) with the development headers. You'll also need system packages OpenMPI and zlib. Those can be installed as follows
