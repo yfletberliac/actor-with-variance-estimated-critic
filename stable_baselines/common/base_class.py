@@ -229,7 +229,7 @@ class BaseRLModel(ABC):
         self._param_load_ops = OrderedDict()
         with self.graph.as_default():
             for param in loadable_parameters:
-                placeholder = tf.placeholder(dtype=param.dtype, shape=param.shape)
+                placeholder = tf.compat.v1.placeholder(dtype=param.dtype, shape=param.shape)
                 # param.name is unique (tensorflow variables have unique names)
                 self._param_load_ops[param.name] = (placeholder, param.assign(placeholder))
 
@@ -277,25 +277,25 @@ class BaseRLModel(ABC):
                 val_interval = int(n_epochs / 10)
 
         with self.graph.as_default():
-            with tf.variable_scope('pretrain'):
+            with tf.compat.v1.variable_scope('pretrain'):
                 if continuous_actions:
                     obs_ph, actions_ph, deterministic_actions_ph = self._get_pretrain_placeholders()
-                    loss = tf.reduce_mean(tf.square(actions_ph - deterministic_actions_ph))
+                    loss = tf.reduce_mean(input_tensor=tf.square(actions_ph - deterministic_actions_ph))
                 else:
                     obs_ph, actions_ph, actions_logits_ph = self._get_pretrain_placeholders()
                     # actions_ph has a shape if (n_batch,), we reshape it to (n_batch, 1)
                     # so no additional changes is needed in the dataloader
                     actions_ph = tf.expand_dims(actions_ph, axis=1)
                     one_hot_actions = tf.one_hot(actions_ph, self.action_space.n)
-                    loss = tf.nn.softmax_cross_entropy_with_logits_v2(
+                    loss = tf.nn.softmax_cross_entropy_with_logits(
                         logits=actions_logits_ph,
                         labels=tf.stop_gradient(one_hot_actions)
                     )
-                    loss = tf.reduce_mean(loss)
-                optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate, epsilon=adam_epsilon)
+                    loss = tf.reduce_mean(input_tensor=loss)
+                optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate, epsilon=adam_epsilon)
                 optim_op = optimizer.minimize(loss, var_list=self.params)
 
-            self.sess.run(tf.global_variables_initializer())
+            self.sess.run(tf.compat.v1.global_variables_initializer())
 
         if self.verbose > 0:
             print("Pretraining with Behavior Cloning...")

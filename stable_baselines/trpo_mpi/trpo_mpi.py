@@ -140,32 +140,32 @@ class TRPO(ActorCriticRLModel):
                                              None, reuse=False, **self.policy_kwargs)
 
                 # Network for old policy
-                with tf.variable_scope("oldpi", reuse=False):
+                with tf.compat.v1.variable_scope("oldpi", reuse=False):
                     old_policy = self.policy(self.sess, self.observation_space, self.action_space, self.n_envs, 1,
                                              None, reuse=False, **self.policy_kwargs)
 
-                with tf.variable_scope("loss", reuse=False):
-                    atarg = tf.placeholder(dtype=tf.float32, shape=[None])  # Target advantage function (if applicable)
-                    ret = tf.placeholder(dtype=tf.float32, shape=[None])  # Empirical return
+                with tf.compat.v1.variable_scope("loss", reuse=False):
+                    atarg = tf.compat.v1.placeholder(dtype=tf.float32, shape=[None])  # Target advantage function (if applicable)
+                    ret = tf.compat.v1.placeholder(dtype=tf.float32, shape=[None])  # Empirical return
 
                     observation = self.policy_pi.obs_ph
                     action = self.policy_pi.pdtype.sample_placeholder([None])
 
                     kloldnew = old_policy.proba_distribution.kl(self.policy_pi.proba_distribution)
                     ent = self.policy_pi.proba_distribution.entropy()
-                    meankl = tf.reduce_mean(kloldnew)
-                    meanent = tf.reduce_mean(ent)
+                    meankl = tf.reduce_mean(input_tensor=kloldnew)
+                    meanent = tf.reduce_mean(input_tensor=ent)
                     entbonus = self.entcoeff * meanent
 
                     explained_variance = explained_variance_tensor(self.policy_pi.value_flat, ret)
                     variance = variance_tensor(ret)
-                    vferr = self.vf_coef*tf.reduce_mean(tf.square(self.policy_pi.value_flat - ret))\
+                    vferr = self.vf_coef*tf.reduce_mean(input_tensor=tf.square(self.policy_pi.value_flat - ret))\
                             + self.avec_coef*(1-explained_variance)*variance
 
                     # advantage * pnew / pold
                     ratio = tf.exp(self.policy_pi.proba_distribution.logp(action) -
                                    old_policy.proba_distribution.logp(action))
-                    surrgain = tf.reduce_mean(ratio * atarg)
+                    surrgain = tf.reduce_mean(input_tensor=ratio * atarg)
 
                     optimgain = surrgain + entbonus
                     losses = [optimgain, meankl, entbonus, surrgain, meanent]
@@ -180,8 +180,8 @@ class TRPO(ActorCriticRLModel):
                     self.get_flat = tf_util.GetFlat(var_list, sess=self.sess)
                     self.set_from_flat = tf_util.SetFromFlat(var_list, sess=self.sess)
 
-                    klgrads = tf.gradients(dist, var_list)
-                    flat_tangent = tf.placeholder(dtype=tf.float32, shape=[None], name="flat_tan")
+                    klgrads = tf.gradients(ys=dist, xs=var_list)
+                    flat_tangent = tf.compat.v1.placeholder(dtype=tf.float32, shape=[None], name="flat_tan")
                     shapes = [var.get_shape().as_list() for var in var_list]
                     start = 0
                     tangents = []
@@ -189,19 +189,19 @@ class TRPO(ActorCriticRLModel):
                         var_size = tf_util.intprod(shape)
                         tangents.append(tf.reshape(flat_tangent[start: start + var_size], shape))
                         start += var_size
-                    gvp = tf.add_n([tf.reduce_sum(grad * tangent)
+                    gvp = tf.add_n([tf.reduce_sum(input_tensor=grad * tangent)
                                     for (grad, tangent) in zipsame(klgrads, tangents)])  # pylint: disable=E1111
                     # Fisher vector products
                     fvp = tf_util.flatgrad(gvp, var_list)
 
-                    tf.summary.scalar('entropy_loss', meanent)
-                    tf.summary.scalar('policy_gradient_loss', optimgain)
-                    tf.summary.scalar('value_function_loss', surrgain)
-                    tf.summary.scalar('approximate_kullback-leibler', meankl)
-                    tf.summary.scalar('loss', optimgain + meankl + entbonus + surrgain + meanent)
+                    tf.compat.v1.summary.scalar('entropy_loss', meanent)
+                    tf.compat.v1.summary.scalar('policy_gradient_loss', optimgain)
+                    tf.compat.v1.summary.scalar('value_function_loss', surrgain)
+                    tf.compat.v1.summary.scalar('approximate_kullback-leibler', meankl)
+                    tf.compat.v1.summary.scalar('loss', optimgain + meankl + entbonus + surrgain + meanent)
 
                     self.assign_old_eq_new = \
-                        tf_util.function([], [], updates=[tf.assign(oldv, newv) for (oldv, newv) in
+                        tf_util.function([], [], updates=[tf.compat.v1.assign(oldv, newv) for (oldv, newv) in
                                                           zipsame(tf_util.get_globals_vars("oldpi"),
                                                                   tf_util.get_globals_vars("model"))])
                     self.compute_losses = tf_util.function([observation, old_policy.obs_ph, action, atarg], losses)
@@ -234,27 +234,27 @@ class TRPO(ActorCriticRLModel):
                     MPI.COMM_WORLD.Bcast(th_init, root=0)
                     self.set_from_flat(th_init)
 
-                with tf.variable_scope("Adam_mpi", reuse=False):
+                with tf.compat.v1.variable_scope("Adam_mpi", reuse=False):
                     self.vfadam = MpiAdam(vf_var_list, sess=self.sess)
                     if self.using_gail:
                         self.d_adam = MpiAdam(self.reward_giver.get_trainable_variables(), sess=self.sess)
                         self.d_adam.sync()
                     self.vfadam.sync()
-                with tf.variable_scope("input_info", reuse=False):
-                    tf.summary.scalar('discounted_rewards', tf.reduce_mean(ret))
-                    tf.summary.scalar('learning_rate', tf.reduce_mean(self.vf_stepsize))
-                    tf.summary.scalar('advantage', tf.reduce_mean(atarg))
-                    tf.summary.scalar('kl_clip_range', tf.reduce_mean(self.max_kl))
+                with tf.compat.v1.variable_scope("input_info", reuse=False):
+                    tf.compat.v1.summary.scalar('discounted_rewards', tf.reduce_mean(input_tensor=ret))
+                    tf.compat.v1.summary.scalar('learning_rate', tf.reduce_mean(input_tensor=self.vf_stepsize))
+                    tf.compat.v1.summary.scalar('advantage', tf.reduce_mean(input_tensor=atarg))
+                    tf.compat.v1.summary.scalar('kl_clip_range', tf.reduce_mean(input_tensor=self.max_kl))
 
                     if self.full_tensorboard_log:
-                        tf.summary.histogram('discounted_rewards', ret)
-                        tf.summary.histogram('learning_rate', self.vf_stepsize)
-                        tf.summary.histogram('advantage', atarg)
-                        tf.summary.histogram('kl_clip_range', self.max_kl)
+                        tf.compat.v1.summary.histogram('discounted_rewards', ret)
+                        tf.compat.v1.summary.histogram('learning_rate', self.vf_stepsize)
+                        tf.compat.v1.summary.histogram('advantage', atarg)
+                        tf.compat.v1.summary.histogram('kl_clip_range', self.max_kl)
                         if tf_util.is_image(self.observation_space):
-                            tf.summary.image('observation', observation)
+                            tf.compat.v1.summary.image('observation', observation)
                         else:
-                            tf.summary.histogram('observation', observation)
+                            tf.compat.v1.summary.histogram('observation', observation)
 
                 self.timed = timed
                 self.allmean = allmean
@@ -267,7 +267,7 @@ class TRPO(ActorCriticRLModel):
                 if self.using_gail:
                     self.params.extend(self.reward_giver.get_trainable_variables())
 
-                self.summary = tf.summary.merge_all()
+                self.summary = tf.compat.v1.summary.merge_all()
 
                 self.compute_lossandgrad = \
                     tf_util.function([observation, old_policy.obs_ph, action, atarg, ret],
@@ -359,8 +359,8 @@ class TRPO(ActorCriticRLModel):
 
                         with self.timed("computegrad"):
                             steps = self.num_timesteps + (k + 1) * (seg["total_timestep"] / self.g_step)
-                            run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                            run_metadata = tf.RunMetadata() if self.full_tensorboard_log else None
+                            run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
+                            run_metadata = tf.compat.v1.RunMetadata() if self.full_tensorboard_log else None
                             # run loss backprop with summary, and save the metadata (memory, compute time, ...)
                             if writer is not None and (1 + iters_so_far) % 10 == 0:
                                 summary, grad, *lossbefore = self.compute_lossandgrad(*args, tdlamret, sess=self.sess,

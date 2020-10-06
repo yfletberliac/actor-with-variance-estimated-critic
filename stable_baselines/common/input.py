@@ -17,12 +17,12 @@ def observation_input(ob_space, batch_size=None, name='Ob', scale=False):
     :return: (TensorFlow Tensor, TensorFlow Tensor) input_placeholder, processed_input_tensor
     """
     if isinstance(ob_space, Discrete):
-        observation_ph = tf.placeholder(shape=(batch_size,), dtype=tf.int32, name=name)
+        observation_ph = tf.compat.v1.placeholder(shape=(batch_size,), dtype=tf.int32, name=name)
         processed_observations = tf.cast(tf.one_hot(observation_ph, ob_space.n), tf.float32)
         return observation_ph, processed_observations
 
     elif isinstance(ob_space, Box):
-        observation_ph = tf.placeholder(shape=(batch_size,) + ob_space.shape, dtype=ob_space.dtype, name=name)
+        observation_ph = tf.compat.v1.placeholder(shape=(batch_size,) + ob_space.shape, dtype=ob_space.dtype, name=name)
         processed_observations = tf.cast(observation_ph, tf.float32)
         # rescale to [1, 0] if the bounds are defined
         if (scale and
@@ -34,12 +34,12 @@ def observation_input(ob_space, batch_size=None, name='Ob', scale=False):
         return observation_ph, processed_observations
 
     elif isinstance(ob_space, MultiBinary):
-        observation_ph = tf.placeholder(shape=(batch_size, ob_space.n), dtype=tf.int32, name=name)
+        observation_ph = tf.compat.v1.placeholder(shape=(batch_size, ob_space.n), dtype=tf.int32, name=name)
         processed_observations = tf.cast(observation_ph, tf.float32)
         return observation_ph, processed_observations
 
     elif isinstance(ob_space, MultiDiscrete):
-        observation_ph = tf.placeholder(shape=(batch_size, len(ob_space.nvec)), dtype=tf.int32, name=name)
+        observation_ph = tf.compat.v1.placeholder(shape=(batch_size, len(ob_space.nvec)), dtype=tf.int32, name=name)
         processed_observations = tf.concat([
             tf.cast(tf.one_hot(input_split, ob_space.nvec[i]), tf.float32) for i, input_split
             in enumerate(tf.split(observation_ph, len(ob_space.nvec), axis=-1))

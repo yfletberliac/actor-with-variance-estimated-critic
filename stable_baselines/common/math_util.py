@@ -38,14 +38,14 @@ def explained_variance(y_pred, y_true):
 def explained_variance_tensor(y_pred, y_true):
 
     assert y_true.get_shape().ndims == 1 and y_pred.get_shape().ndims == 1
-    _, var_y = tf.nn.moments(y_true, axes=0)
-    return 1 - tf.nn.moments(y_true - y_pred, axes=0)[1] / var_y
+    _, var_y = tf.nn.moments(x=y_true, axes=0)
+    return 1 - tf.nn.moments(x=y_true - y_pred, axes=0)[1] / var_y
 
 
 def variance_tensor(y_true):
 
     assert y_true.get_shape().ndims == 1
-    _, var_y = tf.nn.moments(y_true, axes=0)
+    _, var_y = tf.nn.moments(x=y_true, axes=0)
     return var_y
 
 
